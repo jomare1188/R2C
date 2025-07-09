@@ -7,6 +7,6 @@ process salmonIndex {
 
     script:
         """
-        salmon index -t $reference_genome -i salmon_index
+        salmon index -t $reference_genome -p ${NSLOTS} -i salmon_index
         """
 }
