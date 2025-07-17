@@ -40,9 +40,10 @@ workflow {
 		]
 
     trimmed_fastq_ch = fastq_ch.map{ sample_name, fastq_list -> [ sample_name, fastq_list, ref_files ] } | bbduk
-
     // trimmed_fastq_ch = fastq_ch.combine(ref_files) | bbduk   
     bbduk.out.view{ "bbduk: $it" }
+
+    trimmed_fastq_files_ch = trimmed_fastq_ch.map { run, trimmed_files, refstats, stats -> tuple(run, trimmed_files) }
 
     // run fastqc on trimmed data 
     trimmed_fastqc_ch = trimmed_fastq_ch | trimmed_fastqc
@@ -57,10 +58,11 @@ workflow {
     salmonIndex.out.view{ "salmonIndex: $it" }
     
     // run salmonQuant on reference genome 
-    salmon_quant_ch = trimmed_fastq_ch.combine(salmon_index_ch) | salmonQuant
+    // salmon_quant_ch = trimmed_fastq_ch.combine(salmon_index_ch) | salmonQuant
+    salmon_quant_ch = trimmed_fastq_files_ch.combine(salmon_index_ch) | salmonQuant
     salmonQuant.out.view{ "salmonQuant: $it" } 
     
     // combine all quantification files into a single expression matrix
-    salmon_quantmerge_ch = salmon_quant_ch.map{ sample, quant -> file(quant.getParent()) }.collect() | salmonQuantMerge
+    salmon_quantmerge_ch = salmon_quant_ch.map{ sample, salmon_dir ->  file("${salmon_dir}/quant.sf")}.collect() |  file("${salmon_dir}/quant.sf" 
     salmonQuantMerge.out.view{ "salmonQuantMerge: $it" }
 }
