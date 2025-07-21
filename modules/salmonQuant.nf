@@ -3,7 +3,7 @@ process salmonQuant {
         tuple val(run), path(trimmed_reads), path(salmon_index)
 
     output:
-        tuple val(run), path("${run}/quant.sf")
+        path("${run}") 
 
     script:
         if (trimmed_reads.size() == 2) {
@@ -12,7 +12,8 @@ process salmonQuant {
                 -1 ${trimmed_reads[0]} \
                 -2 ${trimmed_reads[1]} \
                 -o ${run} \
-		-p ${NSLOTS} \
+		-p 12 \
+                --numGibbsSamples 100 \
                 --validateMappings
             """
         } else if (trimmed_reads.size() == 1) {

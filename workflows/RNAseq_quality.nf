@@ -10,13 +10,11 @@ include { multiqc as trimmed_multiqc} from "../modules/multiqc.nf"
 include { salmonIndex               } from "../modules/salmonIndex.nf"
 include { salmonQuant               } from "../modules/salmonQuant.nf"
 include { salmonQuantMerge          } from "../modules/salmonQuantMerge.nf"
+include { bbduk_stats               } from "../modules/bbduk_stats.nf"
 
 workflow {
-    /*
-     * Look for files like sample1_R1.fastq.gz and sample1_R2.fastq.gz,
-     * grouped by 'sample1'
-     * Adjust the path and pattern to your filenames if needed.
-     */
+
+    // channel for input files
     fastq_ch = Channel.fromFilePairs('/Storage/data1/jorge.munoz/DOLORES/RAWDATA/*_{R1,R2}_001.fastq.gz')
 
     // run fastqc on raw data
@@ -38,12 +36,18 @@ workflow {
 				"/Storage/data1/jorge.munoz/DOLORES/nf/R2C/data/silva-euk-18s-id95.fasta",
 				"/Storage/data1/jorge.munoz/DOLORES/nf/R2C/data/silva-euk-28s-id98.fasta"
 		]
-
-    trimmed_fastq_ch = fastq_ch.map{ sample_name, fastq_list -> [ sample_name, fastq_list, ref_files ] } | bbduk
-    // trimmed_fastq_ch = fastq_ch.combine(ref_files) | bbduk   
+    // run bbduk
+    trimmed_fastq_ch = fastq_ch.map { sample_name, fastq_list -> [ sample_name, fastq_list, ref_files ] } | bbduk 
     bbduk.out.view{ "bbduk: $it" }
-
+    // create channel for fastq trimmed files
     trimmed_fastq_files_ch = trimmed_fastq_ch.map { run, trimmed_files, refstats, stats -> tuple(run, trimmed_files) }
+    // create channel for refstats bbduk files
+    refstats_files_ch = trimmed_fastq_ch.map { run, trimmed_files, refstats, stats -> refstats }.collect() 
+
+    // Extract refstats files and run bbduk_stats analysis
+    // bbduk_stats_ch = refstats_files_ch | bbduk_stats
+    bbduk_stats_ch = bbduk_stats(refstats_files_ch, file("${projectDir}/../bin/readCleaningSummary.R"))
+    bbduk_stats.out.view{ "bbduk_stats: $it" }
 
     // run fastqc on trimmed data 
     trimmed_fastqc_ch = trimmed_fastq_ch | trimmed_fastqc
@@ -54,15 +58,15 @@ workflow {
     trimmed_multiqc.out.view{ "trimmed_multiqc: $it" }
     
     // run salmonIndex on reference genome 
-    salmon_index_ch = salmonIndex(params.ref_genome)
-    salmonIndex.out.view{ "salmonIndex: $it" }
+    // salmon_index_ch = salmonIndex(params.ref_genome)
+    salmon_index_ch = Channel.fromPath(params.index_salmon, checkIfExists: true)
+    // salmonIndex.out.view{ "salmonIndex: $it" }
     
     // run salmonQuant on reference genome 
-    // salmon_quant_ch = trimmed_fastq_ch.combine(salmon_index_ch) | salmonQuant
     salmon_quant_ch = trimmed_fastq_files_ch.combine(salmon_index_ch) | salmonQuant
     salmonQuant.out.view{ "salmonQuant: $it" } 
     
     // combine all quantification files into a single expression matrix
-    salmon_quantmerge_ch = salmon_quant_ch.map{ sample, salmon_dir ->  file("${salmon_dir}/quant.sf")}.collect() |  file("${salmon_dir}/quant.sf" 
+    salmon_quantmerge_ch = salmon_quant_ch.map{ salmon_dir -> file("${salmon_dir}/quant.sf")}.collect() | salmonQuantMerge
     salmonQuantMerge.out.view{ "salmonQuantMerge: $it" }
 }
