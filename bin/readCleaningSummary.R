@@ -1,7 +1,7 @@
 #!/usr/bin/env R
 
 library(readr)
-reads<-read.delim("summary.txt",header=FALSE)
+reads<-read.delim("bbduk_stats.txt",header=FALSE)
 colnames(reads)<-c('Sample','Category','NumberReads')
 head(reads)
 

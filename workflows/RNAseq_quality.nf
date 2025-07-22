@@ -39,6 +39,9 @@ workflow {
     // run bbduk
     trimmed_fastq_ch = fastq_ch.map { sample_name, fastq_list -> [ sample_name, fastq_list, ref_files ] } | bbduk 
     bbduk.out.view{ "bbduk: $it" }
+    // try this no solution the wartning
+    // bbduk_ch = fastq_ch.map { sample_name, fastq_list -> [ sample_name, fastq_list, ref_files ] } | bbduk
+    
     // create channel for fastq trimmed files
     trimmed_fastq_files_ch = trimmed_fastq_ch.map { run, trimmed_files, refstats, stats -> tuple(run, trimmed_files) }
     // create channel for refstats bbduk files
@@ -49,8 +52,8 @@ workflow {
     bbduk_stats_ch = bbduk_stats(refstats_files_ch, file("${projectDir}/../bin/readCleaningSummary.R"))
     bbduk_stats.out.view{ "bbduk_stats: $it" }
 
-    // run fastqc on trimmed data 
-    trimmed_fastqc_ch = trimmed_fastq_ch | trimmed_fastqc
+    // run fastqc on trimmed data // modify here 
+    trimmed_fastqc_ch = trimmed_fastq_files_ch | trimmed_fastqc
     trimmed_fastqc.out.view{ "trimmed_fastqc: $it" }
 
     // group only fastqc directories and run multiqc 
@@ -67,6 +70,7 @@ workflow {
     salmonQuant.out.view{ "salmonQuant: $it" } 
     
     // combine all quantification files into a single expression matrix
-    salmon_quantmerge_ch = salmon_quant_ch.map{ salmon_dir -> file("${salmon_dir}/quant.sf")}.collect() | salmonQuantMerge
+    // salmon_quantmerge_ch = salmon_quant_ch.map{ salmon_dir -> file("${salmon_dir}/quant.sf")}.collect() | salmonQuantMerge
+    salmon_quantmerge_ch = salmon_quant_ch.collect() | salmonQuantMerge
     salmonQuantMerge.out.view{ "salmonQuantMerge: $it" }
 }
